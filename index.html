@@ -1,0 +1,267 @@
+<html>
+  <head>
+    <style>
+      .row {
+      }
+      .piece {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        border: 1px solid #f0f;
+      }
+      .piece[data-value=red] {
+        background: #ff0000;
+      }
+      .piece[data-value=green] {
+        background: #00ff00;
+      }
+      .piece[data-value=placeable] {
+        background: #00fff0;
+      }
+      .piece[data-value=blue] {
+        background: #0000ff;
+      }
+    </style>
+  </head>
+  <body>
+  </body>
+</html>
+<script>
+  var w = 10;
+  var h = 10;
+  var m = [];
+
+  var PieceType = {
+    none: 0,
+    placeable: 99,
+
+    red: 1,
+    blue: 2,
+    green: 3,
+  };
+  var v_to_color = {};
+  for (var i in PieceType) {
+    v_to_color[PieceType[i]] = i;
+  }
+
+  var cur_team = PieceType.red;
+  var cur_turn = cur_team;
+  var n_players = 2;
+
+  var selected_dom;
+  var placing = false;
+  var abs = Math.abs;
+
+  function select(x, y) {
+    var k = [];
+    for (i = 0; i < h; ++i) {
+      k.push([]);
+      for (j = 0; j < w; ++j) {
+        if (m[i][j] == PieceType.none && abs(x - j) <= 2 && abs(i - y) <= 2) {
+          k[i][j] = PieceType.placeable;
+        } else {
+          k[i][j] = m[i][j];
+        }
+      }
+    }
+    render(k);
+    selected_dom = get_piece_dom(x, y);
+  }
+  function piece_on_click(e) {
+    var x = this.data.x;
+    var y = this.data.y;
+    if (placing) {
+      var selected_x = selected_dom.data.x;
+      var selected_y = selected_dom.data.y;
+      if (m[y][x] === PieceType.none && abs(selected_x - x) <= 2 && abs(selected_y - y) <= 2) {
+        if (abs(selected_x - x) <= 1 && abs(selected_y - y) <= 1) {
+          //clone
+          m[y][x] = cur_team;
+        } else {
+          //move
+          m[selected_y][selected_x] = PieceType.none;
+          m[y][x] = cur_team;
+        }
+        render(m);
+      } else {
+        //cancel
+        render(m);
+      }
+      placing = false;
+    } else if (m[y][x] == cur_team) {
+      placing = true;
+      select(x, y);
+    }
+  }
+  function init() {
+    var row, piece, i, j;
+    for (i = 0; i < h; ++i) {
+      row = document.createElement('div');
+      row.className = 'row';
+      for (j = 0; j < w; ++j) {
+        piece = document.createElement('div');
+        piece.className = 'piece';
+        piece.data = {
+          x: j,
+          y: i,
+        };
+        piece.addEventListener('click', piece_on_click, false);
+        row.appendChild(piece);
+      }
+      document.body.appendChild(row);
+    }
+    m = empty_map();
+  }
+  function get_piece_dom(x, y) {
+    return document.body.getElementsByClassName('row')[y].getElementsByClassName('piece')[x];
+  }
+  function render_piece(x, y, value) {
+    get_piece_dom(x, y).setAttribute('data-value', value);
+  }
+  function render(map) {
+    for_each_piece(function(i, j) {
+      render_piece(j, i, v_to_color[map[i][j]]);
+    });
+  }
+  function for_each_piece(cb) {
+    var i, j;
+    for (i = 0; i < h; ++i) {
+      for (j = 0; j < w; ++j) {
+        cb(i, j);
+      }
+    }
+  }
+  function empty_map() {
+    var k = [];
+    var i, j;
+    for (i = 0; i < h; ++i) {
+      k.push([]);
+      for (j = 0; j < w; ++j) {
+        k[i].push(PieceType.none);
+      }
+    }
+    return k;
+  }
+  function placeable_candidates_for_piece(map, i, j) {
+    var res = [], k, q;
+    for (k = i - 2; k <= i + 2; ++k) {
+      for (q = j - 2; q <= j + 2; ++q) {
+        if (map[k] && map[k][q] === PieceType.none) {
+          res.push([k, q]);
+        }
+      }
+    }
+    return res;
+  }
+  function get_moveable_pieces(map, team) {
+    var res = [];
+    var placeable;
+    for_each_piece(function(i, j) {
+      if (map[i][j] === team) {
+        placeable = placeable_candidates_for_piece(map, i, j);
+        if (placeable.length) {
+          res.push([i, j, placeable]);
+        }
+      }
+    });
+    return res;
+  }
+  function clone_map(map) {
+    var res = empty_map();
+    for_each_piece(function(i, j) {
+      res[i][j] = map[i][j];
+    });
+    return res;
+  }
+
+  function next_team(t) {
+    if (t + 1 > n_players) {
+      return 1;
+    }
+    return t + 1;
+  }
+  function move(map, old_i, old_j, new_i, new_j) {
+    var team = map[old_i][old_j];
+    var count = 1;
+    if (abs(new_i - old_i) > 1 || abs(new_j - old_j) > 1) { // jump
+      map[old_i][old_j] = PieceType.none;
+      count = Math.random() * 2.15 - 2;
+    }
+    map[new_i][new_j] = team;
+    var i, j;
+    for (i = new_i - 1; i <= new_i + 1; ++i) {
+      for (j = new_j - 1; j <= new_j + 1; ++j) {
+        if (map[i] && map[i][j] != undefined && map[i][j] != PieceType.none && map[i][j] != team) {
+          map[i][j] = team;
+          ++ count;
+        }
+      }
+    }
+    return count;
+  }
+  function ai_move(map, team, depth, loss) {
+    if (depth > 1) {
+      return [loss];
+    }
+    var moveable_pieces = get_moveable_pieces(map, team);
+    var a, b, c, i , j, mark, temp_loss, min_loss = 999, min_loss_a, min_loss_b, res_loss, old_i, old_j, new_i, new_j;
+    var clone;
+    for (a in moveable_pieces) {
+      old_i = moveable_pieces[a][0]
+      old_j = moveable_pieces[a][1]
+      c = moveable_pieces[a][2];
+      for (b in c) {
+        clone = clone_map(map);
+        //move
+        new_i = c[b][0];
+        new_j = c[b][1];
+
+        mark = move(clone, old_i, old_j, new_i, new_j);
+
+        //console.log(new_i, new_j, team);
+        //print(clone);
+
+        if (team !== cur_team) {
+          temp_loss = loss + mark;
+        } else {
+          temp_loss = loss - mark;
+        }
+        res_loss = ai_move(clone, next_team(team), depth + 1, temp_loss)[0];
+        if (res_loss < min_loss) {
+          min_loss_a = a;
+          min_loss_b = b;
+          min_loss = res_loss;
+        }
+
+        //break;
+      }
+      //break;
+    }
+    if (min_loss_a) {
+      return [min_loss, moveable_pieces[min_loss_a][0], moveable_pieces[min_loss_a][1], moveable_pieces[min_loss_a][2][min_loss_b][0], moveable_pieces[min_loss_a][2][min_loss_b][1]];
+    } else {
+      return [loss];
+    }
+  }
+  function print(map) {
+    for(var i in map) {
+      var s='';
+      for(var j in map[i]) s+=map[i][j] + ' ';
+      console.log(s);
+    }
+  }
+  init();
+  m[0][1] = PieceType.red;
+  m[9][9] = PieceType.blue;
+
+  render(m);
+  var res;
+  setInterval(function() {
+    res = ai_move(m, cur_team, 0, 0);
+    if (res[1] != undefined) {
+      move(m, res[1], res[2], res[3], res[4]);
+      cur_team = next_team(cur_team);
+      render(m);
+    }
+  }, 100);
+</script>
