@@ -27,8 +27,8 @@
   </body>
 </html>
 <script>
-  var w = 10;
-  var h = 10;
+  var w = 8;
+  var h = 8;
   var m = [];
 
   var PieceType = {
@@ -74,14 +74,13 @@
       var selected_x = selected_dom.data.x;
       var selected_y = selected_dom.data.y;
       if (m[y][x] === PieceType.none && abs(selected_x - x) <= 2 && abs(selected_y - y) <= 2) {
-        if (abs(selected_x - x) <= 1 && abs(selected_y - y) <= 1) {
-          //clone
-          m[y][x] = cur_team;
-        } else {
-          //move
-          m[selected_y][selected_x] = PieceType.none;
-          m[y][x] = cur_team;
+        move(m, selected_y, selected_x, y, x);
+        cur_team = next_team(cur_team);
+        var res = ai_move(m, cur_team, 0, 0);
+        if (res[1] != undefined) {
+          move(m, res[1], res[2], res[3], res[4]);
         }
+        cur_team = next_team(cur_team);
         render(m);
       } else {
         //cancel
@@ -185,7 +184,7 @@
     var count = 1;
     if (abs(new_i - old_i) > 1 || abs(new_j - old_j) > 1) { // jump
       map[old_i][old_j] = PieceType.none;
-      count = Math.random() * 2.15 - 2;
+      count = 0;
     }
     map[new_i][new_j] = team;
     var i, j;
@@ -193,7 +192,7 @@
       for (j = new_j - 1; j <= new_j + 1; ++j) {
         if (map[i] && map[i][j] != undefined && map[i][j] != PieceType.none && map[i][j] != team) {
           map[i][j] = team;
-          ++ count;
+          count += 1.0001;
         }
       }
     }
@@ -203,8 +202,9 @@
     if (depth > 1) {
       return [loss];
     }
+    var is_foe = team === cur_team;
     var moveable_pieces = get_moveable_pieces(map, team);
-    var a, b, c, i , j, mark, temp_loss, min_loss = 999, min_loss_a, min_loss_b, res_loss, old_i, old_j, new_i, new_j;
+    var a, b, c, i , j, mark, cur_loss, min_loss = 999, min_loss_a, min_loss_b, foe_loss, old_i, old_j, new_i, new_j;
     var clone;
     for (a in moveable_pieces) {
       old_i = moveable_pieces[a][0]
@@ -218,29 +218,20 @@
 
         mark = move(clone, old_i, old_j, new_i, new_j);
 
-        //console.log(new_i, new_j, team);
-        //print(clone);
-
-        if (team !== cur_team) {
-          temp_loss = loss + mark;
-        } else {
-          temp_loss = loss - mark;
-        }
-        res_loss = ai_move(clone, next_team(team), depth + 1, temp_loss)[0];
-        if (res_loss < min_loss) {
+        cur_loss = loss - mark;
+        foe_loss = ai_move(clone, next_team(team), depth + 1, - cur_loss)[0];
+        if (- foe_loss < min_loss) {
           min_loss_a = a;
           min_loss_b = b;
-          min_loss = res_loss;
+          min_loss = - foe_loss;
         }
-
-        //break;
       }
-      //break;
     }
     if (min_loss_a) {
       return [min_loss, moveable_pieces[min_loss_a][0], moveable_pieces[min_loss_a][1], moveable_pieces[min_loss_a][2][min_loss_b][0], moveable_pieces[min_loss_a][2][min_loss_b][1]];
     } else {
-      return [loss];
+      // can't move
+      return [min_loss];
     }
   }
   function print(map) {
@@ -250,18 +241,19 @@
       console.log(s);
     }
   }
+  function get_all_placeable_pieces(map) {
+    var res = [];
+    for_each_piece(function(i, j) {
+      if (map[i][j] === PieceType.none) {
+        res.push([i, j]);
+      }
+    });
+    return res;
+  }
   init();
-  m[0][1] = PieceType.red;
-  m[9][9] = PieceType.blue;
+  m[1][1] = PieceType.red;
+  m[h - 2][w - 2] = PieceType.blue;
 
   render(m);
-  var res;
-  setInterval(function() {
-    res = ai_move(m, cur_team, 0, 0);
-    if (res[1] != undefined) {
-      move(m, res[1], res[2], res[3], res[4]);
-      cur_team = next_team(cur_team);
-      render(m);
-    }
-  }, 100);
+
 </script>
