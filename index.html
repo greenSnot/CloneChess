@@ -1,13 +1,20 @@
 <html>
+  <meta charset="utf-8">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="viewport" content=" user-scalable=no, initial-scale=1.0,minimum-scale=1.0, maximum-scale=1.0">
+  <meta name="author" content="greenSnot@github">
+  <meta http-equiv="pragma" content="no-cache">
   <head>
     <style>
       .row {
       }
       .piece {
         display: inline-block;
-        width: 30px;
-        height: 30px;
-        border: 1px solid #f0f;
+        width: 40px;
+        height: 40px;
+        padding: 1px;
+        border: 1px solid #eee;
+        box-sizing: border-box;
       }
       .piece[data-value=red] {
         background: #ff0000;
@@ -16,7 +23,13 @@
         background: #00ff00;
       }
       .piece[data-value=placeable] {
-        background: #00fff0;
+        background: rgba(255, 0, 0, 0.5);
+      }
+      .piece[data-old-place=true] {
+        border: 2px solid #00d9ff;
+      }
+      .piece[data-new-place=true] {
+        background: #00d9ff!important;
       }
       .piece[data-value=blue] {
         background: #0000ff;
@@ -75,13 +88,22 @@
       var selected_y = selected_dom.data.y;
       if (m[y][x] === PieceType.none && abs(selected_x - x) <= 2 && abs(selected_y - y) <= 2) {
         move(m, selected_y, selected_x, y, x);
+        render(m);
         cur_team = next_team(cur_team);
         var res = ai_move(m, cur_team, 0, 0);
         if (res[1] != undefined) {
           move(m, res[1], res[2], res[3], res[4]);
+          render(m, true);
+          get_piece_dom(res[2], res[1]).setAttribute('data-old-place', true);
+          get_piece_dom(res[4], res[3]).setAttribute('data-new-place', true);
         }
         cur_team = next_team(cur_team);
-        render(m);
+
+        if (get_all_placeable_pieces(m).length == 0 || get_moveable_pieces(m, PieceType.red).length == 0 || get_moveable_pieces(m, PieceType.blue).length == 0) {
+          var n_blue = document.querySelectorAll('.piece[data-value=blue]').length;
+          var n_red = document.querySelectorAll('.piece[data-value=red]').length;
+          alert('red:' + n_red + ' blue:' + n_blue);
+        }
       } else {
         //cancel
         render(m);
@@ -114,12 +136,16 @@
   function get_piece_dom(x, y) {
     return document.body.getElementsByClassName('row')[y].getElementsByClassName('piece')[x];
   }
-  function render_piece(x, y, value) {
+  function render_piece(x, y, value, reset) {
     get_piece_dom(x, y).setAttribute('data-value', value);
+    if (reset) {
+      get_piece_dom(x, y).setAttribute('data-old-place', false);
+      get_piece_dom(x, y).setAttribute('data-new-place', false);
+    }
   }
-  function render(map) {
+  function render(map, reset) {
     for_each_piece(function(i, j) {
-      render_piece(j, i, v_to_color[map[i][j]]);
+      render_piece(j, i, v_to_color[map[i][j]], reset);
     });
   }
   function for_each_piece(cb) {
@@ -252,6 +278,7 @@
   }
   init();
   m[1][1] = PieceType.red;
+  m[h - 3][w - 3] = PieceType.blue;
   m[h - 2][w - 2] = PieceType.blue;
 
   render(m);
